@@ -19,18 +19,59 @@ Windows only (credential storage and the audio/OBS tooling assume it).
 
 ### OBS scene setup
 
-The module expects a two-layered scene layout:
+`!ap setup <name1> [name2] …` (broadcaster only) is the whole session setup in one command: the number of names decides the POV count (you plus 1–7 named runners, eight POVs max). Missing scenes are created, the runner names are written into the text sources, and the POV rewards are created/enabled. Scenes that already exist are left untouched, so re-running — with different names or more runners — is safe and only fills the gaps. The scenes:
 
-- Per runner, a self-contained shared scene (e.g. `AP_SHARED_P2`) containing their capture and a text source for their name (e.g. `AP_P2_NAME`).
-- Per runner, a broadcast scene (e.g. `AP_POV_P2`) that nests the shared scenes in some arrangement (their POV big, the others small).
-- Your own POV broadcast scene (e.g. `AP_POV_Me`); your own name text is static, so it needs no slot.
+- Per runner, a shared scene (`AP_SHARED_Me`, `AP_SHARED_P2`, …) on a 1920x1080 canvas: a color background in the runner's color, a window capture (`AP_P2_WINDOW`) and a browser source (`AP_P2_BROWSER`) inset 18px so the background shows as a colored frame, and a name text source (`AP_P2_NAME`) in the upper left. Both capture sources start hidden so they don't get in the way — unhide whichever matches how that runner delivers their feed (see below). Your own scene instead gets a visible window capture and an `AP_Me_AUDIO` application audio capture, no browser source.
+- Per runner, a broadcast scene (`AP_POV_Me`, `AP_POV_P2`, …) that nests the shared scenes: the featured runner at 1440x810 in the top left, the others as 480x270 thumbnails — three below the primary, then up to four in the right column.
+- One `AP_DISCORD` scene nested into every broadcast scene, holding a `Discord Overlay` browser source and a `Discord Audio` application audio capture, so Discord follows the stream across POV switches. (obs-websocket cannot create source groups, so a nested scene stands in for the folder.)
 
-The scene and source names are free-form — whatever you use, mirror it in the `Archipelago` section of `appsettings.json`. Each slot's `Color` is the reward button color, ideally matching the runner's frame color in OBS.
+These names are the defaults the module works with out of the box. If you prefer your own scene/source names, build the scenes yourself and mirror the names in the `Archipelago` section of `appsettings.json` (`OwnScene`, `OwnSharedScene`, `OwnNameSource`, `OwnAudioSource`, and a `Slots` array with `PovScene`/`SharedScene`/`NameSource`/`BrowserSource`/`Color` per runner — a configured `Slots` array replaces all seven defaults). Each slot's `Color` is both the frame color and the reward button color.
+
+### Getting the runner feeds in
+
+#### Your own POV
+
+Your game runs locally, so no Discord or vdo.ninja is involved for yourself:
+
+- `AP_Me_WINDOW` — pick your game window in its properties. If a fullscreen-exclusive game won't show up in a window capture, replace it with a Game Capture source by hand; the layout doesn't care what the source is, only that it sits in the shared scene.
+- `AP_Me_AUDIO` — an application audio capture; select your game in it once per session. The bot mutes and unmutes it automatically depending on the featured POV (see audio routing below). Don't be tempted to use a plain desktop audio device instead — that would also pick up Discord and double the `Discord Audio` capture.
+- Your mic is the normal global mic input in OBS settings, independent of these scenes. There's no echo risk from the Discord capture: Discord never plays your own voice back, so the application audio capture only carries the other runners.
+
+For the other runners, unhide either the window capture or the browser source in their shared scene, per runner:
+
+#### Discord screenshare (window capture)
+
+Everyone joins a voice channel and streams their game (Go Live). For each runner, pop their stream out into its own window (hover the stream, click the pop-out icon), unhide their `AP_Pn_WINDOW` source, and set that window in it. Things to know:
+
+- The pop-out windows must stay open for the capture to work. They can sit behind OBS, but don't minimize them — minimized windows stop rendering.
+- OBS finds windows by title, and pop-out titles are per runner, so expect to re-pick the windows at the start of each session. Pop all streams out first, then go down the `AP_SHARED_*` scenes in one pass.
+- If a capture stays black, set the source's capture method to "Windows 10 (1903 and up)" in its properties.
+- Quality is whatever Discord gives that runner (720p30 without Nitro) — fine for thumbnails, visibly soft when featured at 1440x810.
+- Game audio rides along with the runner's voice in the channel, so the `Discord Audio` capture picks up everything mixed together; there is no per-runner audio control. When such a POV is featured, the bot plays your own game audio alongside it (see audio routing below).
+
+This is the lazy option: runners need nothing but Discord.
+
+#### vdo.ninja (browser source)
+
+[vdo.ninja](https://vdo.ninja/) sends each runner's screen to a browser source over WebRTC — noticeably better quality than Discord and no pop-out juggling, at the cost of a one-time link exchange. Agree on a stream ID per runner (anything unique, e.g. `mysession-p2`):
+
+- The runner opens `https://vdo.ninja/?push=mysession-p2` in a browser, picks "Screenshare", selects their game window, and enables audio on the share.
+- You put `https://vdo.ninja/?view=mysession-p2` as the URL of their `AP_P2_BROWSER` source and unhide it. The links are reusable, so a recurring group only does this once.
+- The browser sources are created with "Control audio via OBS" enabled and muted: the bot unmutes only the featured runner's source on each POV switch, so the games don't all talk over each other while voice chat stays on Discord the whole time.
+- WebRTC is peer-to-peer: each feed costs the runner some upload bandwidth, and feeds keep flowing only while the runner's push tab stays open.
+
+#### Discord overlay and audio (`AP_DISCORD`)
+
+The `AP_DISCORD` scene is nested into every broadcast scene, so both sources follow the stream wherever the POV switches:
+
+- `Discord Audio` is an application audio capture: open its properties once and select Discord as the captured application. That puts the voice channel (and any Go Live audio) on stream. Don't also capture desktop audio, or you'll hear it twice.
+- `Discord Overlay` is a browser source for the [Discord StreamKit overlay](https://streamkit.discord.com/overlay): choose "Install for OBS", pick the Voice Widget, select your server and voice channel, and copy the generated URL into the source. It shows who is in the channel and lights up whoever is speaking; style and position it however you like. It needs the Discord desktop app running to detect the channel.
 
 ### Running a session
 
-- `!ap setup <name1> [name2] [name3]` (broadcaster only) — writes the runner names into the name text sources and creates/enables one 1-point "POV: name" reward per runner, plus your own.
+- `!ap setup <name1> [name2] … [name7]` (broadcaster only) — creates any missing scenes, writes the runner names into the name text sources, and creates/enables one 1-point "POV: name" reward per runner, plus your own.
 - Viewers redeem a POV reward → the program output switches to that runner's broadcast scene. The redemption is fulfilled on success and refunded if the scene switch fails.
+- Every switch also routes the game audio: all runner browser sources are muted except the featured runner's, if their browser source is the one unhidden in their shared scene. If the featured POV captures a Discord pop-out instead (no per-runner audio available) — or is your own — your `AP_Me_AUDIO` game audio is unmuted in its place. Set `AlwaysShareOwnAudio: true` in the `Archipelago` config section to keep your own game audio on during every POV instead of only those.
 - `!ap stop` — disables the POV rewards after the session. They are also disabled on bot shutdown.
 
 Commands are deliberately silent in chat; outcomes are visible in OBS and the rewards list. Check `log.txt` next to the exe when something seems to not react.

@@ -12,6 +12,8 @@ public sealed class ApPovEntry
     public string Name { get; set; } = string.Empty;
     public string RewardId { get; set; } = string.Empty;
     public string Scene { get; set; } = string.Empty;
+    public string SharedScene { get; set; } = string.Empty;
+    public string BrowserSource { get; set; } = string.Empty;
 }
 
 public sealed class ApState
@@ -62,19 +64,20 @@ public sealed class ArchipelagoPovService : IHostedService
 
     public async Task SetupAsync(string[] playerNames, CancellationToken ct)
     {
-        if (playerNames.Length == 0 || playerNames.Length > _settings.Slots.Count)
-            throw new ArgumentException($"Expected 1 to {_settings.Slots.Count} player names.");
+        const int maxNames = ArchipelagoSettings.MaxPovCount - 1;
+        if (playerNames.Length == 0 || playerNames.Length > maxNames)
+            throw new ArgumentException($"Expected 1 to {maxNames} player names.");
 
-        var desired = new List<(string Name, string Scene, string Color)>
+        var desired = new List<(string Name, string Scene, string SharedScene, string BrowserSource, string Color)>
         {
-            (_settings.OwnName, _settings.OwnScene, _settings.OwnColor)
+            (_settings.OwnName, _settings.OwnScene, _settings.OwnSharedScene, string.Empty, _settings.OwnColor)
         };
 
         for (var i = 0; i < playerNames.Length; i++)
         {
-            var slot = _settings.Slots[i];
+            var slot = _settings.SlotFor(i + 2);
             await _obs.SetTextAsync(slot.NameSource, playerNames[i], ct);
-            desired.Add((playerNames[i], slot.PovScene, slot.Color));
+            desired.Add((playerNames[i], slot.PovScene, slot.SharedScene, slot.BrowserSource, slot.Color));
         }
 
         var entries = new List<ApPovEntry>();
@@ -86,10 +89,17 @@ public sealed class ArchipelagoPovService : IHostedService
 
         for (var i = 0; i < desired.Count; i++)
         {
-            var (name, scene, color) = desired[i];
+            var (name, scene, sharedScene, browserSource, color) = desired[i];
             var rewardId = await EnsurePovRewardAsync(
                 $"POV: {name}", color, i < previous.Count ? previous[i].RewardId : null, ct);
-            entries.Add(new ApPovEntry { Name = name, RewardId = rewardId, Scene = scene });
+            entries.Add(new ApPovEntry
+            {
+                Name = name,
+                RewardId = rewardId,
+                Scene = scene,
+                SharedScene = sharedScene,
+                BrowserSource = browserSource
+            });
         }
 
         foreach (var stale in previous.Skip(desired.Count))
@@ -162,12 +172,13 @@ public sealed class ArchipelagoPovService : IHostedService
 
     private async Task OnRedemptionAsync(ChannelPointRedemptionEvent e, CancellationToken ct)
     {
-        ApPovEntry? entry;
+        List<ApPovEntry> entries;
         lock (_lock)
         {
-            entry = _state.Entries.FirstOrDefault(x => x.RewardId == e.RewardId);
+            entries = [.. _state.Entries];
         }
 
+        var entry = entries.FirstOrDefault(x => x.RewardId == e.RewardId);
         if (entry is null) return;
 
         try
@@ -180,6 +191,30 @@ public sealed class ArchipelagoPovService : IHostedService
         {
             _logger.LogError(ex, "POV switch to {Name} failed; refunding {User}", entry.Name, e.User);
             await _rewards.CancelRedemptionAsync(e.RewardId, e.RedemptionId, ct);
+            return;
+        }
+
+        await ApplyAudioRoutingAsync(entry, entries, ct);
+    }
+
+    private async Task ApplyAudioRoutingAsync(
+        ApPovEntry featured, IReadOnlyList<ApPovEntry> entries, CancellationToken ct)
+    {
+        try
+        {
+            var featuredUsesBrowser = featured.BrowserSource.Length > 0 &&
+                                      await _obs.GetSceneItemEnabledAsync(
+                                          featured.SharedScene, featured.BrowserSource, ct);
+
+            foreach (var entry in entries.Where(x => x.BrowserSource.Length > 0))
+                await _obs.SetInputMutedAsync(entry.BrowserSource, entry != featured || !featuredUsesBrowser, ct);
+
+            var shareOwn = _settings.AlwaysShareOwnAudio || !featuredUsesBrowser;
+            await _obs.SetInputMutedAsync(_settings.OwnAudioSource, !shareOwn, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Audio routing for POV '{Name}' failed", featured.Name);
         }
     }
 }

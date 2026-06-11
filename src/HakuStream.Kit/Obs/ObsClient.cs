@@ -33,6 +33,58 @@ public sealed class ObsClient : IDisposable
         _connectLock.Dispose();
     }
 
+    public async Task<IReadOnlyList<string>> GetSceneNamesAsync(CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        return _obs.GetSceneList().Scenes.Select(s => s.Name).ToList();
+    }
+
+    public async Task<IReadOnlyList<string>> GetInputKindsAsync(CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        return _obs.GetInputKindList(false);
+    }
+
+    public async Task CreateSceneAsync(string sceneName, CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        _obs.CreateScene(sceneName);
+    }
+
+    public async Task<int> CreateInputAsync(
+        string sceneName, string inputName, string inputKind, JObject inputSettings, bool enabled = true,
+        CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        return _obs.CreateInput(sceneName, inputName, inputKind, inputSettings, enabled);
+    }
+
+    public async Task<bool> GetSceneItemEnabledAsync(string sceneName, string sourceName, CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        var itemId = _obs.GetSceneItemId(sceneName, sourceName, 0);
+        return _obs.GetSceneItemEnabled(sceneName, itemId);
+    }
+
+    public async Task SetInputMutedAsync(string inputName, bool muted, CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        _obs.SetInputMute(inputName, muted);
+    }
+
+    public async Task<int> AddSceneItemAsync(string sceneName, string sourceName, CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        return _obs.CreateSceneItem(sceneName, sourceName, true);
+    }
+
+    public async Task SetSceneItemTransformAsync(
+        string sceneName, int sceneItemId, JObject transform, CancellationToken ct = default)
+    {
+        await EnsureConnectedAsync(ct);
+        _obs.SetSceneItemTransform(sceneName, sceneItemId, transform);
+    }
+
     public async Task SetSceneItemEnabledAsync(
         string sceneName, string sourceName, bool enabled, CancellationToken ct = default)
     {

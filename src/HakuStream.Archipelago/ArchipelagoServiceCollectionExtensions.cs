@@ -14,6 +14,7 @@ public static class ArchipelagoServiceCollectionExtensions
         services.AddSingleton(configuration.GetSection("Archipelago").Get<ArchipelagoSettings>()
                               ?? new ArchipelagoSettings());
         services.AddSingleton<ArchipelagoPovService>();
+        services.AddSingleton<ArchipelagoObsSetupService>();
         services.AddHostedService(sp => sp.GetRequiredService<ArchipelagoPovService>());
         services.AddChatCommands(typeof(ArchipelagoServiceCollectionExtensions).Assembly);
         return services;

@@ -50,6 +50,7 @@ if (!await auth.EnsureAuthenticatedAsync())
     return;
 }
 
-Log.Information("Archipelago bot running. In chat: !ap setup <name1> [name2] [name3] to start, !ap stop when done.");
+Log.Information(
+    "Archipelago bot running. In chat: !ap setup <name1> [name2] ... to create scenes and rewards, !ap stop when done.");
 await host.RunAsync();
 Log.CloseAndFlush();
