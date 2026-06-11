@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish ArchipelagoBot
+        run: >
+          dotnet publish samples/Archipelago.Host/Archipelago.Host.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+      - name: Zip
+        run: Compress-Archive -Path publish/ArchipelagoBot.exe, publish/appsettings.example.json -DestinationPath ArchipelagoBot-${{ github.ref_name }}-win-x64.zip
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ArchipelagoBot-*.zip
+          generate_release_notes: true

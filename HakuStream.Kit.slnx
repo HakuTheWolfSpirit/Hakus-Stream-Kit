@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/HakuStream.Kit/HakuStream.Kit.csproj" />
+  <Project Path="src/HakuStream.Archipelago/HakuStream.Archipelago.csproj" />
+  <Project Path="samples/Archipelago.Host/Archipelago.Host.csproj" />
+</Solution>
