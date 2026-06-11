@@ -1,5 +1,8 @@
 # HakuStream.Kit
 
+![Archipelago Demo](./docs/obs64_vhkkWLHPAV.gif)
+
+
 Building blocks for a Twitch stream bot, plus ready-to-use modules built on them.
 
 - **HakuStream.Kit** — the framework: Twitch chat + EventSub connection, OAuth device flow with token storage in Windows Credential Manager, attribute-based chat commands and channel-point redeems, an event bus, an OBS WebSocket client, and tiny atomic JSON persistence.
