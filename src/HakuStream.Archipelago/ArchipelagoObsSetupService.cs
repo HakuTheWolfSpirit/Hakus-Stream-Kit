@@ -19,6 +19,10 @@ public sealed class ArchipelagoObsSetupService(
     private const int PrimaryHeight = 810;
     private const int ThumbWidth = 480;
     private const int ThumbHeight = 270;
+    private const string TextFontFace = "Microsoft Tai Le";
+    private const int TextFontSize = 256;
+    private const string TextColor = "#0d6be6";
+    private const int TextOutlineSize = 20;
 
     private static readonly (int X, int Y)[] ThumbnailCells =
     [
@@ -116,7 +120,21 @@ public sealed class ArchipelagoObsSetupService(
 
         var nameId = await obs.CreateInputAsync(pov.SharedScene, pov.NameSource,
             PickKind(kinds, "text_gdiplus", "text_ft2_source"),
-            new JObject { ["text"] = pov.DisplayName }, ct: ct);
+            new JObject
+            {
+                ["text"] = pov.DisplayName,
+                ["font"] = new JObject
+                {
+                    ["face"] = TextFontFace,
+                    ["size"] = TextFontSize,
+                    ["style"] = "Bold"
+                },
+                ["color"] = ToObsColor(TextColor),
+                ["outline"] = true,
+                ["outline_size"] = TextOutlineSize,
+                ["outline_color"] = ToObsColor("#000000"),
+                ["outline_opacity"] = 100
+            }, ct: ct);
         await obs.SetSceneItemTransformAsync(pov.SharedScene, nameId, new JObject
         {
             ["positionX"] = 2 * BorderPx,
