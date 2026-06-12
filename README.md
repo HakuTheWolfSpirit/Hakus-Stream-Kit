@@ -148,7 +148,7 @@ if (!await auth.EnsureAuthenticatedAsync()) return;
 await host.RunAsync();
 ```
 
-`AddTwitch` registers the connection, auth, dispatchers, and registries once. Each module's `AddX` extension registers its settings, services, and its own commands/redeems — adding the module to the host is what activates it. See `samples/Archipelago.Host` for the complete picture, and `docs/adding-a-command.md` for writing commands.
+`AddTwitch` registers the connection, auth, dispatchers, and registries once. The OAuth token is requested with the scopes the Kit itself needs; if your bot calls Twitch APIs beyond those, list the additional scopes in `Twitch:ExtraScopes` in `appsettings.json` (the bot re-authorizes automatically when the stored token is missing any). Each module's `AddX` extension registers its settings, services, and its own commands/redeems — adding the module to the host is what activates it. See `samples/Archipelago.Host` for the complete picture, and `docs/adding-a-command.md` for writing commands.
 
 ## Building
 

@@ -31,7 +31,8 @@ public static class TwitchServiceCollectionExtensions
             sp.GetRequiredService<TokenManager>(),
             settings.ClientId,
             settings.ClientSecret,
-            sp.GetRequiredService<ILogger<TwitchAuthOrchestrator>>()));
+            sp.GetRequiredService<ILogger<TwitchAuthOrchestrator>>(),
+            settings.ExtraScopes));
 
         services.AddSingleton<TwitchChatClient>();
         services.AddSingleton<TwitchChatWriter>();

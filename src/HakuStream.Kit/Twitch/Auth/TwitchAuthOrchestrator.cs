@@ -8,12 +8,13 @@ public sealed class TwitchAuthOrchestrator(
     TokenManager tokenManager,
     string clientId,
     string clientSecret,
-    ILogger<TwitchAuthOrchestrator> logger)
+    ILogger<TwitchAuthOrchestrator> logger,
+    IReadOnlyList<string>? extraScopes = null)
 {
     private const int CallbackPort = 3000;
     private const string RedirectUri = "http://localhost:3000/callback";
 
-    private static readonly string[] Scopes =
+    private static readonly string[] BaseScopes =
     [
         "chat:read",
         "chat:edit",
@@ -23,6 +24,9 @@ public sealed class TwitchAuthOrchestrator(
         "channel:manage:vips",
         "channel:manage:raids"
     ];
+
+    private readonly string[] _scopes =
+        [.. BaseScopes.Concat(extraScopes ?? []).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     public async Task<bool> EnsureAuthenticatedAsync(CancellationToken cancellationToken = default)
     {
@@ -42,7 +46,7 @@ public sealed class TwitchAuthOrchestrator(
                 logger.LogWarning(
                     "Existing token is missing required scopes (have: {Have}; need: {Need}); re-authorizing",
                     string.Join(",", validation.Scopes),
-                    string.Join(",", Scopes));
+                    string.Join(",", _scopes));
             }
             else if (!string.IsNullOrEmpty(tokenManager.RefreshToken) && await TryRefreshTokenAsync(cancellationToken))
             {
@@ -61,9 +65,9 @@ public sealed class TwitchAuthOrchestrator(
         return await AuthorizeAsync(cancellationToken);
     }
 
-    private static bool HasAllRequiredScopes(IReadOnlyList<string> grantedScopes)
+    private bool HasAllRequiredScopes(IReadOnlyList<string> grantedScopes)
     {
-        return Scopes.All(required => grantedScopes.Contains(required, StringComparer.OrdinalIgnoreCase));
+        return _scopes.All(required => grantedScopes.Contains(required, StringComparer.OrdinalIgnoreCase));
     }
 
     private async Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken)
@@ -79,7 +83,7 @@ public sealed class TwitchAuthOrchestrator(
     private async Task<bool> AuthorizeAsync(CancellationToken cancellationToken)
     {
         var state = Guid.NewGuid().ToString("N");
-        var authUrl = oauthClient.BuildAuthorizationUrl(clientId, RedirectUri, Scopes, state);
+        var authUrl = oauthClient.BuildAuthorizationUrl(clientId, RedirectUri, _scopes, state);
 
         logger.LogInformation(
             "Twitch authorization required. Copy this URL into your browser:{NewLine}{Url}",
