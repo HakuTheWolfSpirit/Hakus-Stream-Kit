@@ -22,10 +22,21 @@ jobs:
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
-      - name: Zip
+      - name: Zip ArchipelagoBot
         run: Compress-Archive -Path publish/ArchipelagoBot.exe, publish/appsettings.example.json -DestinationPath ArchipelagoBot-${{ github.ref_name }}-win-x64.zip
+      - name: Publish ShoutoutBot
+        run: >
+          dotnet publish samples/Shoutout.Host/Shoutout.Host.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish-shoutout
+      - name: Zip ShoutoutBot
+        run: Compress-Archive -Path publish-shoutout/ShoutoutBot.exe, publish-shoutout/appsettings.example.json -DestinationPath ShoutoutBot-${{ github.ref_name }}-win-x64.zip
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: ArchipelagoBot-*.zip
+          files: |
+            ArchipelagoBot-*.zip
+            ShoutoutBot-*.zip
           generate_release_notes: true

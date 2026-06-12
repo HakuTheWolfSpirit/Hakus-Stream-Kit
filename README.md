@@ -7,18 +7,23 @@ Building blocks for a Twitch stream bot, plus ready-to-use modules built on them
 
 - **HakuStream.Kit** — the framework: Twitch chat + EventSub connection, OAuth device flow with token storage in Windows Credential Manager, attribute-based chat commands and channel-point redeems, an event bus, an OBS WebSocket client, and tiny atomic JSON persistence.
 - **HakuStream.Archipelago** — POV switching for [Archipelago](https://archipelago.gg/) multiworld races: viewers spend channel points to choose which runner's POV the stream shows.
-- **samples/Archipelago.Host** — a ready-to-run bot exe that hosts the Archipelago module. If you just want the bot, this is what you run.
+- **HakuStream.Shoutouts** — `!so`, `!raid`, and `!watchclip` for moderators: shouting out a streamer plays one of their clips live in OBS, and raids play a send-off clip before the raid fires.
+- **samples/Archipelago.Host**, **samples/Shoutout.Host** — ready-to-run bot exes hosting one module each. If you just want a bot, these are what you run.
 
 Windows only (credential storage and the audio/OBS tooling assume it).
 
 ## I just want the exe
 
-1. Download the latest `ArchipelagoBot` zip from the Releases page and unzip it anywhere.
+1. Download the zip of the bot you want (`ArchipelagoBot` or `ShoutoutBot`) from the Releases page and unzip it anywhere.
 2. Copy `appsettings.example.json` to `appsettings.json` (same folder as the exe) and fill it in:
    - **Twitch**: create an app at [dev.twitch.tv/console](https://dev.twitch.tv/console/apps) (category: Chat Bot, OAuth redirect URL: `http://localhost:3000/callback`, client type: confidential). Put its Client ID and Client Secret in the config, plus your Twitch username and channel.
    - **Obs**: in OBS, Tools → WebSocket Server Settings → enable, copy the password. Default port is 4455.
-   - **Archipelago**: see the OBS scene setup below.
-3. Run `ArchipelagoBot.exe`. On first start a browser window opens to authorize the bot with Twitch; the token is stored in Windows Credential Manager (run with `ArchipelagoBot.exe twitchreauth` to clear it).
+   - The module's own section (**Archipelago** or **Shoutout**): see its OBS scene setup below.
+3. Run the exe. On first start a browser window opens to authorize the bot with Twitch; the token is stored in Windows Credential Manager (run the exe with the `twitchreauth` argument to clear it).
+
+Each exe is a standalone bot, so running more than one means an `appsettings.json` next to each — the Twitch and Obs sections are simply copied. A combined host may come later.
+
+## Archipelago
 
 ### OBS scene setup
 
@@ -80,6 +85,24 @@ The `AP_DISCORD` scene is nested into every broadcast scene, so both sources fol
 Commands are deliberately silent in chat; outcomes are visible in OBS and the rewards list. Check `log.txt` next to the exe when something seems to not react.
 
 Reward IDs are persisted in `data/archipelago.json` next to the exe and reused across setups (rewards are retitled rather than recreated). This keeps the bot clear of Twitch's 50-rewards-per-channel cap — don't delete that file casually.
+
+## Shoutouts
+
+`!so <user-or-clip-url>` (alias `!shoutout`, mods only) posts a chat announcement, fires Twitch's native `/shoutout` when possible (best effort — it has cooldowns and needs the target live), and plays a random recent clip of the target in OBS. `!raid <user>` plays a send-off clip first and only starts the raid once the clip has played, so you never raid into dead air. `!watchclip` replays the most recent clip link posted in chat. Besides the `!so` announcement the commands are silent in chat; outcomes are in `log.txt`.
+
+### OBS scene setup
+
+There is no setup command; create the scene and two sources by hand once:
+
+- `SHARED_SHOUTOUT` — a scene; nest it into your main scenes wherever the clip should appear.
+- `ShoutOutMedia` — a media source in that scene. The bot points it at the clip for playback and clears it afterwards.
+- `ShoutOutBroadcaster` — a text source in that scene for the shouted-out streamer's name.
+
+Leave both sources hidden; the bot unhides them for the clip's duration and hides them again. Different names go in the `Shoutout` section of `appsettings.json`. `ClipsWithinDays` bounds how recent the random clip should be (falls back to all-time when the window has none). `Message` is the `!so` chat announcement — `{name}` and `{url}` are replaced with the target's display name and channel link; set it to `""` to keep `!so` fully silent in chat.
+
+### How clip playback works (and when it breaks)
+
+OBS media sources need a direct video URL, which Twitch's official API does not provide. The signed `.mp4` URL therefore comes from Twitch's internal GraphQL endpoint — the same one the twitch.tv player (and tools like streamlink and TwitchDownloader) use, with the public web client id. It is undocumented and can change without notice. When it breaks, only clip playback dies: chat shoutouts keep working, raids are aborted rather than sent into dead air, and individual clips that fail to sign are skipped in favor of another candidate.
 
 ## Using the modules in your own bot
 
