@@ -3,6 +3,8 @@
   <Project Path="src/HakuStream.Kit/HakuStream.Kit.csproj" />
   <Project Path="src/HakuStream.Archipelago/HakuStream.Archipelago.csproj" />
   <Project Path="src/HakuStream.Shoutouts/HakuStream.Shoutouts.csproj" />
+  <Project Path="src/HakuStream.SongRequests/HakuStream.SongRequests.csproj" />
   <Project Path="samples/Archipelago.Host/Archipelago.Host.csproj" />
   <Project Path="samples/Shoutout.Host/Shoutout.Host.csproj" />
+  <Project Path="samples/SongRequest.Host/SongRequest.Host.csproj" />
 </Solution>

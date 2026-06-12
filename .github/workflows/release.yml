@@ -33,10 +33,20 @@ jobs:
           -o publish-shoutout
       - name: Zip ShoutoutBot
         run: Compress-Archive -Path publish-shoutout/ShoutoutBot.exe, publish-shoutout/appsettings.example.json -DestinationPath ShoutoutBot-${{ github.ref_name }}-win-x64.zip
+      - name: Publish SongRequestBot
+        run: >
+          dotnet publish samples/SongRequest.Host/SongRequest.Host.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish-songrequest
+      - name: Zip SongRequestBot
+        run: Compress-Archive -Path publish-songrequest/SongRequestBot.exe, publish-songrequest/appsettings.example.json -DestinationPath SongRequestBot-${{ github.ref_name }}-win-x64.zip
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ArchipelagoBot-*.zip
             ShoutoutBot-*.zip
+            SongRequestBot-*.zip
           generate_release_notes: true

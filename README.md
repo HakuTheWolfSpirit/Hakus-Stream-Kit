@@ -8,17 +8,18 @@ Building blocks for a Twitch stream bot, plus ready-to-use modules built on them
 - **HakuStream.Kit** — the framework: Twitch chat + EventSub connection, OAuth device flow with token storage in Windows Credential Manager, attribute-based chat commands and channel-point redeems, an event bus, an OBS WebSocket client, and tiny atomic JSON persistence.
 - **HakuStream.Archipelago** — POV switching for [Archipelago](https://archipelago.gg/) multiworld races: viewers spend channel points to choose which runner's POV the stream shows.
 - **HakuStream.Shoutouts** — `!so`, `!raid`, and `!watchclip` for moderators: shouting out a streamer plays one of their clips live in OBS, and raids play a send-off clip before the raid fires.
-- **samples/Archipelago.Host**, **samples/Shoutout.Host** — ready-to-run bot exes hosting one module each. If you just want a bot, these are what you run.
+- **HakuStream.SongRequests** — `!sr <youtube-url>` song requests: downloads the audio via yt-dlp and plays it in-process, with a fair per-user queue and a backup playlist for when the queue runs dry.
+- **samples/Archipelago.Host**, **samples/Shoutout.Host**, **samples/SongRequest.Host** — ready-to-run bot exes hosting one module each. If you just want a bot, these are what you run.
 
 Windows only (credential storage and the audio/OBS tooling assume it).
 
 ## I just want the exe
 
-1. Download the zip of the bot you want (`ArchipelagoBot` or `ShoutoutBot`) from the Releases page and unzip it anywhere.
+1. Download the zip of the bot you want (`ArchipelagoBot`, `ShoutoutBot`, or `SongRequestBot`) from the Releases page and unzip it anywhere.
 2. Copy `appsettings.example.json` to `appsettings.json` (same folder as the exe) and fill it in:
    - **Twitch**: create an app at [dev.twitch.tv/console](https://dev.twitch.tv/console/apps) (category: Chat Bot, OAuth redirect URL: `http://localhost:3000/callback`, client type: confidential). Put its Client ID and Client Secret in the config, plus your Twitch username and channel.
-   - **Obs**: in OBS, Tools → WebSocket Server Settings → enable, copy the password. Default port is 4455.
-   - The module's own section (**Archipelago** or **Shoutout**): see its OBS scene setup below.
+   - **Obs** (ArchipelagoBot and ShoutoutBot only): in OBS, Tools → WebSocket Server Settings → enable, copy the password. Default port is 4455. SongRequestBot plays audio itself and doesn't talk to OBS.
+   - The module's own section (**Archipelago**, **Shoutout**, or **Songs**): see its setup section below.
 3. Run the exe. On first start a browser window opens to authorize the bot with Twitch; the token is stored in Windows Credential Manager (run the exe with the `twitchreauth` argument to clear it).
 
 Each exe is a standalone bot, so running more than one means an `appsettings.json` next to each — the Twitch and Obs sections are simply copied. A combined host may come later.
@@ -104,7 +105,30 @@ Leave both sources hidden; the bot unhides them for the clip's duration and hide
 
 OBS media sources need a direct video URL, which Twitch's official API does not provide. The signed `.mp4` URL therefore comes from Twitch's internal GraphQL endpoint — the same one the twitch.tv player (and tools like streamlink and TwitchDownloader) use, with the public web client id. It is undocumented and can change without notice. When it breaks, only clip playback dies: chat shoutouts keep working, raids are aborted rather than sent into dead air, and individual clips that fail to sign are skipped in favor of another candidate.
 
-## Using the modules in your own bot
+## Song requests
+
+Viewers request songs with `!sr <youtube-url>`; the bot downloads the audio with yt-dlp and plays it itself — no media player to install or control. The queue is fair: each user's Nth request is sorted behind everyone else's N-1th, so one person queueing ten songs doesn't starve the rest. When the queue is empty, a backup playlist takes over as a shuffled rotation.
+
+### Requirements
+
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org/) must be on PATH (`winget install yt-dlp.yt-dlp` and `winget install Gyan.FFmpeg`); the exe checks both at startup. When downloads suddenly fail across the board, yt-dlp is usually outdated — run `yt-dlp -U` (or `winget upgrade yt-dlp.yt-dlp`).
+
+### Commands
+
+- `!sr <youtube-url>` — request a song. Rules (length between `MinDurationSeconds` and `MaxDurationSeconds`, at least `MinViewCount` views, no duplicates in the queue) are skipped for mods.
+- `!q` / `!queue` — show the current song and the next five.
+- `!oops` / `!wrongsong` `[url]` — remove your own last request (or a specific one by URL).
+- `!skip` (mods) — skip the current song.
+- `!playlist` (mods) — add the current song to the backup playlist.
+- `!pause`, `!volume <0-100>`, `!prev` (broadcaster) — pause/resume, set volume, replay the previous song (the interrupted one returns to the front of the queue).
+
+### Getting the audio into OBS
+
+The bot plays audio in its own process through the default output device, so an OBS **Application Audio Capture** source pointed at `SongRequestBot.exe` gives you a dedicated music source you can mix, duck, or mute independently of the rest of your stream — that's the reason it ships as its own exe. Alternatively, set `OutputDevice` in the `Songs` config section to a substring of an output device's name (e.g. a virtual audio cable) to route the music there instead of the default device.
+
+### Configuration and data
+
+The `Songs` section of `appsettings.json`: `BackupPlaylistUrl` seeds the backup playlist from a YouTube playlist on every start (new entries are merged in). `Volume` (0–100) is the startup volume. `AudioDirectory`/`WorkingDirectory` default to `data/songs` next to the exe; downloaded songs are kept forever and reused, so repeat requests are instant. The queue survives restarts (`data/songqueue.json`), as do the backup playlist and song titles.
 
 Reference `HakuStream.Kit` and the modules you want, then compose a host:
 
