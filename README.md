@@ -107,7 +107,9 @@ OBS media sources need a direct video URL, which Twitch's official API does not 
 
 ## Song requests
 
-Viewers request songs with `!sr <youtube-url>`; the bot downloads the audio with yt-dlp and plays it itself — no media player to install or control. The queue is fair: each user's Nth request is sorted behind everyone else's N-1th, so one person queueing ten songs doesn't starve the rest. When the queue is empty, a backup playlist takes over as a shuffled rotation.
+Viewers request songs with `!sr <youtube-url>` or plain search terms (`!sr darude sandstorm`); the bot downloads the audio with yt-dlp and plays it itself — no media player to install or control. The queue is fair: each user's Nth request is sorted behind everyone else's N-1th, so one person queueing ten songs doesn't starve the rest. When the queue is empty, a backup playlist takes over as a shuffled rotation.
+
+Searches check the top `SearchResults` (default 5) YouTube results in order and take the first one YouTube lists as music (by video category or attached artist/track metadata) that also passes the request rules; if none is music, the best non-music hit is used and the chat reply says so. Set `RequireMusic: true` to instead reject non-music requests outright — including direct URLs — for everyone below mod.
 
 ### Requirements
 
@@ -115,7 +117,7 @@ Viewers request songs with `!sr <youtube-url>`; the bot downloads the audio with
 
 ### Commands
 
-- `!sr <youtube-url>` — request a song. Rules (length between `MinDurationSeconds` and `MaxDurationSeconds`, at least `MinViewCount` views, no duplicates in the queue) are skipped for mods.
+- `!sr <youtube-url or search terms>` — request a song. Rules (length between `MinDurationSeconds` and `MaxDurationSeconds`, at least `MinViewCount` views, optionally `RequireMusic`, no duplicates in the queue) are skipped for mods.
 - `!q` / `!queue` — show the current song and the next five.
 - `!oops` / `!wrongsong` `[url]` — remove your own last request (or a specific one by URL).
 - `!skip` (mods) — skip the current song.

@@ -11,4 +11,5 @@ public sealed record SongRequestResult(
     bool Success,
     QueuedSong? Song = null,
     int? Position = null,
-    string? Error = null);
+    string? Error = null,
+    bool IsMusic = true);

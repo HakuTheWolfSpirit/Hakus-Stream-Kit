@@ -7,17 +7,23 @@ public sealed class SongRequestCommand(SongRequestService songs) : IChatCommand
 {
     public async Task RunAsync(CommandContext ctx, CancellationToken ct)
     {
-        if (ctx.Arg(0) is not { } url)
+        if (ctx.Args.Length == 0)
         {
-            await ctx.ReplyAsync("Usage: !sr <youtube-url>");
+            await ctx.ReplyAsync("Usage: !sr <youtube-url or search terms>");
             return;
         }
 
+        var query = string.Join(' ', ctx.Args);
         var bypassRules = ctx.Permission >= PermissionLevel.Moderator;
-        var result = await songs.RequestAsync(url, ctx.User, bypassRules, ct);
+        var result = await songs.RequestAsync(query, ctx.User, bypassRules, ct);
 
-        await ctx.ReplyAsync(result.Success
-            ? $"Song '{result.Song!.Title}' added to queue at position {result.Position}."
-            : result.Error!);
+        if (!result.Success)
+        {
+            await ctx.ReplyAsync(result.Error!);
+            return;
+        }
+
+        var note = result.IsMusic ? "" : " (YouTube doesn't list this one as music.)";
+        await ctx.ReplyAsync($"Song '{result.Song!.Title}' added to queue at position {result.Position}.{note}");
     }
 }

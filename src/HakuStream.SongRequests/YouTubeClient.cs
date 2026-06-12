@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace HakuStream.SongRequests;
 
-public sealed record VideoInfo(string Id, string Title, long ViewCount, int DurationSeconds);
+public sealed record VideoInfo(string Id, string Title, long ViewCount, int DurationSeconds, bool IsMusic);
 
 public sealed record PlaylistEntry(string Id, string? Title);
 
@@ -72,7 +72,8 @@ public sealed partial class YouTubeClient(ILogger<YouTubeClient> logger)
             if (root.TryGetProperty("duration", out var dur) && dur.ValueKind == JsonValueKind.Number)
                 duration = dur.GetInt32();
 
-            return new VideoInfo(videoId, root.GetProperty("title").GetString() ?? "Unknown", viewCount, duration);
+            return new VideoInfo(videoId, root.GetProperty("title").GetString() ?? "Unknown", viewCount, duration,
+                IsMusic(root));
         }
         catch (Exception ex)
         {
@@ -130,6 +131,32 @@ public sealed partial class YouTubeClient(ILogger<YouTubeClient> logger)
             CleanupPartialDownload(expectedPath);
             throw;
         }
+    }
+
+    private static bool IsMusic(JsonElement root)
+    {
+        if (root.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var category in categories.EnumerateArray())
+            {
+                if (category.ValueKind == JsonValueKind.String &&
+                    string.Equals(category.GetString(), "Music", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return (root.TryGetProperty("artist", out var artist) &&
+                artist.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(artist.GetString())) ||
+               (root.TryGetProperty("track", out var track) &&
+                track.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(track.GetString()));
+    }
+
+    public async Task<List<PlaylistEntry>?> SearchAsync(string query, int maxResults, CancellationToken ct = default)
+    {
+        var sanitized = query.Replace('"', ' ').Replace('\\', ' ').Trim();
+        if (sanitized.Length == 0) return null;
+
+        return await GetPlaylistEntriesAsync($"ytsearch{Math.Max(1, maxResults)}:{sanitized}", ct);
     }
 
     public async Task<List<PlaylistEntry>?> GetPlaylistEntriesAsync(string playlistUrl, CancellationToken ct = default)
