@@ -32,7 +32,7 @@ public static class TwitchServiceCollectionExtensions
             settings.ClientId,
             settings.ClientSecret,
             sp.GetRequiredService<ILogger<TwitchAuthOrchestrator>>(),
-            settings.ExtraScopes));
+            [.. settings.ExtraScopes, .. sp.GetServices<TwitchScopeRequirement>().Select(r => r.Scope)]));
 
         services.AddSingleton<TwitchChatClient>();
         services.AddSingleton<TwitchChatWriter>();
